@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CEOS Media Gallery</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f9f9f9;
+      padding: 2em;
+    }
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      overflow: hidden;
+      text-align: center;
+      transition: transform 0.2s ease;
+    }
+    .card:hover {
+      transform: scale(1.03);
+    }
+    .card img {
+      width: 100%;
+      height: auto;
+    }
+    .desc {
+      padding: 0.5em;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <h1>CEOS Image Dashboard</h1>
+  <div class="gallery" id="gallery"></div>
+
+  <script>
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/1PhKiS2JuDhpBpL1-MMrJd40dVUzR5-nyKtv1rg3MMuM/gviz/tq?tqx=out:csv&sheet=DASHBOARD_FEED";
+
+    async function fetchCSV(url) {
+      const res = await fetch(url);
+      const text = await res.text();
+      return text.split('\n').slice(1).map(row => row.split(','));
+    }
+
+    function createCard([slug, imageUrl, description, theme, galleryUrl]) {
+      const card = document.createElement("div");
+      card.className = "card";
+
+      const link = document.createElement("a");
+      link.href = galleryUrl || "#";
+      link.target = "_blank";
+
+      const img = document.createElement("img");
+      img.src = imageUrl;
+      img.alt = slug;
+
+      const desc = document.createElement("div");
+      desc.className = "desc";
+      desc.textContent = description || slug;
+
+      link.appendChild(img);
+      card.appendChild(link);
+      card.appendChild(desc);
+
+      return card;
+    }
+
+    async function buildGallery() {
+      const data = await fetchCSV(CSV_URL);
+      const gallery = document.getElementById("gallery");
+      data.forEach(row => {
+        if (row.length >= 5 && row[1].startsWith("http")) {
+          const card = createCard(row);
+          gallery.appendChild(card);
+        }
+      });
+    }
+
+    buildGallery();
+  </script>
+</body>
+</html>
