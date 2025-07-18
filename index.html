@@ -1,162 +1,91 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Responsive Image Gallery</title>
-  <style>
-    :root {
-      --bg-color-light: #ffffff;
-      --text-color-light: #000000;
-      --bg-color-dark: #00000000;
-      --text-color-dark: #ffffff;
+<script>
+  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTpXjpnWFYg4fwoBeK9lxP9GvIXF8M6Ecw6mBfdE3vjN9VKrnwnssHbIN78szgV2Jr3IEpdoXpo-wa5/pub?gid=461187973&single=true&output=csv";
+  const IMAGES_PER_PAGE = 15;
+
+  let imageData = [];
+  let currentPage = 1;
+
+  function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+  }
+
+  // Simple CSV parser supporting quoted fields with commas
+  function parseCSV(text) {
+    const lines = text.trim().split('\n');
+    const rows = [];
+    const regex = /("([^"]|"")*"|[^,]*)(,|$)/g;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const row = [];
+      let match;
+      while ((match = regex.exec(line)) !== null) {
+        let field = match[1];
+        if (field.startsWith('"') && field.endsWith('"')) {
+          field = field.slice(1, -1).replace(/""/g, '"');
+        }
+        row.push(field);
+        if (match[3] === '') break;
+      }
+      rows.push(row);
     }
+    return rows;
+  }
 
-    body {
-      font-family: Arial, sans-serif;
-      background-color: var(--bg-color-light);
-      color: var(--text-color-light);
-      margin: 0;
-      padding: 20px;
-      transition: background-color 0.3s, color 0.3s;
-    }
+  function fetchCSVData() {
+    fetch(CSV_URL)
+      .then(response => response.text())
+      .then(data => {
+        const rows = parseCSV(data).slice(1); // skip header
+        imageData = rows.map(cols => ({
+          slug: (cols[0] || "").trim(),
+          imageUrl: (cols[1] || "").trim(),
+          description: (cols[2] || "").trim(),
+          theme: (cols[3] || "").trim(),
+          galleryUrl: (cols[4] || "#").trim()
+        })).filter(item => item.imageUrl && item.imageUrl.startsWith("http"));
 
-    body.dark-mode {
-      background-color: var(--bg-color-dark);
-      color: var(--text-color-dark);
-    }
+        console.log(imageData); // debug
+        renderGallery();
+      })
+      .catch(err => console.error("Failed to load CSV:", err));
+  }
 
-    h1 {
-      text-align: center;
-    }
+  function renderGallery() {
+    const startIndex = (currentPage - 1) * IMAGES_PER_PAGE;
+    const endIndex = startIndex + IMAGES_PER_PAGE;
+    const pageItems = imageData.slice(startIndex, endIndex);
 
-    .toggle-container {
-      display: flex;
-      justify-content: center;
-      margin-bottom: 20px;
-    }
+    const gallery = document.getElementById("gallery");
+    gallery.innerHTML = "";
 
-    .gallery {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-    }
+    pageItems.forEach(item => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <a href="${item.galleryUrl}" target="_blank" rel="noopener noreferrer">
+          <img src="${item.imageUrl}" alt="${item.slug}" />
+        </a>
+        <h3>${item.slug}</h3>
+        <p>${item.description}</p>
+      `;
+      gallery.appendChild(card);
+    });
 
-    .card {
-      background: #eee;
-      border-radius: 8px;
-      padding: 10px;
-      text-align: center;
-      transition: background 0.3s;
-    }
+    document.getElementById("pageInfo").innerText = `Page ${currentPage} of ${Math.ceil(imageData.length / IMAGES_PER_PAGE)}`;
+    document.getElementById("prevBtn").disabled = currentPage === 1;
+    document.getElementById("nextBtn").disabled = endIndex >= imageData.length;
+  }
 
-    .card img {
-      width: 100%;
-      height: auto;
-      border-radius: 4px;
-    }
+  function nextPage() {
+    currentPage++;
+    renderGallery();
+  }
 
-    .pagination {
-      margin-top: 20px;
-      text-align: center;
-    }
+  function prevPage() {
+    currentPage--;
+    renderGallery();
+  }
 
-    .pagination button {
-      margin: 0 5px;
-      padding: 8px 16px;
-      border: none;
-      background: #444;
-      color: #fff;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .pagination button:disabled {
-      background: #999;
-      cursor: not-allowed;
-    }
-  </style>
-</head>
-<body>
-  <h1>Image Gallery</h1>
-  <div class="toggle-container">
-    <button onclick="toggleDarkMode()">Toggle Dark/Light Mode</button>
-  </div>
-  <div class="gallery" id="gallery"></div>
-  <div class="pagination">
-    <button id="prevBtn" onclick="prevPage()">Previous</button>
-    <span id="pageInfo"></span>
-    <button id="nextBtn" onclick="nextPage()">Next</button>
-  </div>
-
-  <script>
-    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTpXjpnWFYg4fwoBeK9lxP9GvIXF8M6Ecw6mBfdE3vjN9VKrnwnssHbIN78szgV2Jr3IEpdoXpo-wa5/pub?gid=461187973&single=true&output=csv";
-    const IMAGES_PER_PAGE = 15;
-
-    let imageData = [];
-    let currentPage = 1;
-
-    function toggleDarkMode() {
-      document.body.classList.toggle('dark-mode');
-    }
-
-    function fetchCSVData() {
-      fetch(CSV_URL)
-        .then(response => response.text())
-        .then(data => {
-          const rows = data.split('\n').slice(1); // skip headers
-          imageData = rows.map(row => {
-            const cols = row.split(',');
-            return {
-              slug: cols[0],
-              imageUrl: cols[1],
-              description: cols[2],
-              theme: cols[3],
-              galleryUrl: cols[4] || "#" // optional fallback
-            };
-          }).filter(item => item.imageUrl && item.imageUrl.startsWith("http"));
-
-          renderGallery();
-        });
-    }
-
-    function renderGallery() {
-      const startIndex = (currentPage - 1) * IMAGES_PER_PAGE;
-      const endIndex = startIndex + IMAGES_PER_PAGE;
-      const pageItems = imageData.slice(startIndex, endIndex);
-
-      const gallery = document.getElementById("gallery");
-      gallery.innerHTML = "";
-
-      pageItems.forEach(item => {
-        const card = document.createElement("div");
-        card.className = "card";
-        card.innerHTML = `
-          <a href="${item.galleryUrl}" target="_blank">
-            <img src="${item.imageUrl}" alt="${item.slug}" />
-          </a>
-          <h3>${item.slug}</h3>
-          <p>${item.description}</p>
-        `;
-        gallery.appendChild(card);
-      });
-
-      document.getElementById("pageInfo").innerText = `Page ${currentPage} of ${Math.ceil(imageData.length / IMAGES_PER_PAGE)}`;
-      document.getElementById("prevBtn").disabled = currentPage === 1;
-      document.getElementById("nextBtn").disabled = endIndex >= imageData.length;
-    }
-
-    function nextPage() {
-      currentPage++;
-      renderGallery();
-    }
-
-    function prevPage() {
-      currentPage--;
-      renderGallery();
-    }
-
-    fetchCSVData();
-  </script>
-</body>
-</html>
+  fetchCSVData();
+</script>
